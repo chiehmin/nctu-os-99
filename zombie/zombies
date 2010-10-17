@@ -1,0 +1,104 @@
+First create a program which generates several child process,
+and do not use wait to collect the info of them:
+
+
+/* zombie.c */
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <limits.h>
+
+int main()
+{
+	pid_t c_pid;
+	int i;
+	for (i=0; i<10; ++i) {
+		switch (c_pid = fork()) {
+			case -1:
+				perror("fork failed!\n");
+				return 0;
+			case 0:
+				/* child process */
+				return 0;
+
+				break;
+			default:
+				/* parent process */
+				printf("fork %d!\n", i+1);
+				break;
+		}
+			
+	}
+	while (1);
+	return 0;
+}
+
+
+Notice that by using while (1);, the parent process never exits.
+
+A zombie process or defunct process is a process that has completed execution
+but still has an entry in the process table.
+This entry is still needed to allow the process that started the (now zombie) process
+to read its exit status.
+(from wikipedia)
+So if we don't let the parent process read their exit status, they would stay in the zombie state.
+
+The following is the running situations of zombie generation.
+The program would generate 10 zombie processes.
+And after the parent process exits, they are all cleared by the OS.
+
+
+Script started on Tue 12 Oct 2010 02:37:42 PM CST
+14:37 shihyh@linux1 [~/test] >ps u
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+shihyh   12237  0.0  0.0 120360  2368 pts/27   Ss   14:33   0:00 /bin/tcsh   
+shihyh   12700  0.0  0.0 110576   888 pts/27   S+   14:37   0:00 script
+shihyh   12701  0.0  0.0 110640   364 pts/27   S+   14:37   0:00 script
+shihyh   12702  0.5  0.0 109764  1872 pts/59   Ss   14:37   0:00 -csh -i
+shihyh   12708  0.0  0.0 111036  1140 pts/59   R+   14:37   0:00 ps u
+14:37 shihyh@linux1 [~/test] >./zombie
+fork 1!
+fork 2!
+fork 3!
+fork 4!
+fork 5!
+fork 6!
+fork 7!
+fork 8!
+fork 9!
+fork 10!
+^Z
+Suspended
+14:37 shihyh@linux1 [~/test] >ps u
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+shihyh   12237  0.0  0.0 120360  2368 pts/27   Ss   14:33   0:00 /bin/tcsh   
+shihyh   12700  0.0  0.0 110576   888 pts/27   S+   14:37   0:00 script
+shihyh   12701  0.0  0.0 110640   364 pts/27   S+   14:37   0:00 script
+shihyh   12702  0.1  0.0 109764  1944 pts/59   Ss   14:37   0:00 -csh -i
+shihyh   12709 35.5  0.0   3732   412 pts/59   T    14:37   0:00 ./zombie
+shihyh   12710  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12711  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12712  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12713  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12714  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12715  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12716  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12717  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12718  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12719  0.0  0.0      0     0 pts/59   Z    14:37   0:00 [zombie] <defunct>
+shihyh   12720  0.0  0.0 111036  1140 pts/59   R+   14:37   0:00 ps u
+14:37 shihyh@linux1 [~/test] >fg
+./zombie
+^C
+14:37 shihyh@linux1 [~/test] >ps u
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+shihyh   12237  0.0  0.0 120360  2368 pts/27   Ss   14:33   0:00 /bin/tcsh   
+shihyh   12700  0.0  0.0 110576   888 pts/27   S+   14:37   0:00 script
+shihyh   12701  0.0  0.0 110640   364 pts/27   S+   14:37   0:00 script
+shihyh   12702  0.0  0.0 109764  1944 pts/59   Ss   14:37   0:00 -csh -i
+shihyh   12722  0.0  0.0 111036  1140 pts/59   R+   14:37   0:00 ps u
+14:37 shihyh@linux1 [~/test] >exit
+
+Script done on Tue 12 Oct 2010 02:38:01 PM CST
