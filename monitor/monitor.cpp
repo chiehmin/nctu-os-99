@@ -4,11 +4,55 @@
 #include <cstdlib>
 #include <cstdio>
 
-#define monitor class
 
 using namespace std;
 const int SIZE = 5;
 const int GURU = 3;
+
+class Monitor {
+	friend class Condition;
+
+	protected:
+		pthread_mutex_t mutex;
+		sem_t next;
+		int next_count;
+		int in_mo;
+
+
+		void print_critical()
+		{
+			printf("#########################\n");
+			printf("%d philosopher is in critical section\n", in_mo);
+		}
+		void entry_section()
+		{
+			pthread_mutex_lock(&mutex);
+			++in_mo;
+		}
+		void exit_section()
+		{
+			--in_mo;
+			if (next_count > 0) {
+				sem_post(&next);
+			} else {
+				pthread_mutex_unlock(&mutex);
+			}
+		}
+
+
+		
+		Monitor()
+			: next_count(0), in_mo(0)
+		{
+			pthread_mutex_init(&mutex, 0);
+			sem_init(&next, 0, 0);
+		}
+		~Monitor()
+		{
+			pthread_mutex_destroy(&mutex);
+			sem_destroy(&next);
+		}
+};
 
 class Condition {
 	private:
@@ -19,11 +63,11 @@ class Condition {
 		sem_t *next;
 		int *next_count;
 	public:
-		void init(pthread_mutex_t *mt, sem_t *nx, int *cnt)
+		void init(Monitor &mo)
 		{
-			mutex = mt;
-			next = nx;
-			next_count = cnt;
+			mutex = &mo.mutex;
+			next = &mo.next;
+			next_count = &mo.next_count;
 		}
 
 		void signal()
@@ -61,12 +105,7 @@ class Condition {
 
 const char* PSTRING[] = {"THINKING", "HUNGRY", "EATING"};
 
-monitor DinningPhilosopher {
-	private:
-		pthread_mutex_t mutex;
-		sem_t next;
-		int next_count;
-		int in_mo;
+class DinningPhilosopher : public Monitor {
 	public:
 		enum {THINKING, HUNGRY, EATING} state[SIZE];
 		Condition self[SIZE];
@@ -105,19 +144,11 @@ monitor DinningPhilosopher {
 
 
 		DinningPhilosopher()
-			: next_count(0), in_mo(0)
 		{
-			pthread_mutex_init(&mutex, 0);
-			sem_init(&next, 0, 0);
 			for (int i = 0; i < SIZE; i++) {
 				state[i] = THINKING;
-				self[i].init(&mutex, &next, &next_count);
+				self[i].init(*this);
 			}
-		}
-		~DinningPhilosopher()
-		{
-			pthread_mutex_destroy(&mutex);
-			sem_destroy(&next);
 		}
 	private:
 		void test(int i)
@@ -138,22 +169,7 @@ monitor DinningPhilosopher {
 			for (int i=0; i<SIZE; ++i) {
 				printf("#%d philosopher is %s\n", i, PSTRING[state[i]]);
 			}
-			printf("#########################\n");
-			printf("%d philosopher is in critical section\n", in_mo);
-		}
-		void entry_section()
-		{
-			pthread_mutex_lock(&mutex);
-			++in_mo;
-		}
-		void exit_section()
-		{
-			--in_mo;
-			if (next_count > 0) {
-				sem_post(&next);
-			} else {
-				pthread_mutex_unlock(&mutex);
-			}
+			print_critical();
 		}
 };
 
