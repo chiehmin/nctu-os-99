@@ -13,7 +13,7 @@ class Monitor {
 	friend class Condition;
 
 	protected:
-		pthread_mutex_t mutex;
+		sem_t mutex;
 		sem_t next;
 		int next_count;
 		int in_mo;
@@ -26,7 +26,7 @@ class Monitor {
 		}
 		void entry_section()
 		{
-			pthread_mutex_lock(&mutex);
+			sem_wait(&mutex);
 			++in_mo;
 		}
 		void exit_section()
@@ -35,7 +35,7 @@ class Monitor {
 			if (next_count > 0) {
 				sem_post(&next);
 			} else {
-				pthread_mutex_unlock(&mutex);
+				sem_post(&mutex);
 			}
 		}
 
@@ -44,12 +44,12 @@ class Monitor {
 		Monitor()
 			: next_count(0), in_mo(0)
 		{
-			pthread_mutex_init(&mutex, 0);
+			sem_init(&mutex, 0, 1);
 			sem_init(&next, 0, 0);
 		}
 		~Monitor()
 		{
-			pthread_mutex_destroy(&mutex);
+			sem_destroy(&mutex);
 			sem_destroy(&next);
 		}
 };
@@ -59,7 +59,7 @@ class Condition {
 		sem_t sem;
 		int count;
 
-		pthread_mutex_t *mutex;
+		sem_t *mutex;
 		sem_t *next;
 		int *next_count;
 		int *in_mo;
@@ -87,7 +87,7 @@ class Condition {
 			if (*next_count > 0) {
 				sem_post(next);
 			} else {
-				pthread_mutex_unlock(mutex);
+				sem_post(mutex);
 			}
 			sem_wait(&sem);
 			sem_wait(next);
@@ -190,7 +190,11 @@ void *philosopher(void *t) {
 		sleep(rand() % 5 + 1);
 		dp.putdown((*who));
 	}
+
+	pthread_exit(0);
 }
+
+pthread_attr_t attr;
 
 int main()
 {
@@ -198,11 +202,13 @@ int main()
 	printf("Press Enter to start.\n");
 	getchar();
 
+	pthread_attr_init(&attr);
+
 	pthread_t pts[SIZE];
 	int who[SIZE];
 	for (int i=0; i<SIZE; ++i) {
 		who[i] = i;
-		pthread_create(&pts[i], 0, philosopher, (void *) &who[i]);
+		pthread_create(&pts[i], &attr, philosopher, (void *) &who[i]);
 	}
 
 	for (int i=0; i<SIZE; ++i) {
@@ -211,5 +217,5 @@ int main()
 
 	printf("Testing finished...\n");
 
-	return 0;
+	pthread_exit(0);
 }
