@@ -22,7 +22,7 @@ class Monitor {
 		void print_critical()
 		{
 			printf("#########################\n");
-			printf("%d philosopher is in critical section\n", in_mo);
+			printf("%d process is in critical section\n", in_mo);
 		}
 		void entry_section()
 		{
@@ -62,12 +62,14 @@ class Condition {
 		pthread_mutex_t *mutex;
 		sem_t *next;
 		int *next_count;
+		int *in_mo;
 	public:
 		void init(Monitor &mo)
 		{
 			mutex = &mo.mutex;
 			next = &mo.next;
 			next_count = &mo.next_count;
+			in_mo = &mo.in_mo;
 		}
 
 		void signal()
@@ -80,6 +82,7 @@ class Condition {
 
 		void wait()
 		{
+			--*in_mo;
 			++count;
 			if (*next_count > 0) {
 				sem_post(next);
@@ -90,6 +93,7 @@ class Condition {
 			sem_wait(next);
 			--*next_count;
 			--count;
+			++*in_mo;
 		}
 
 		Condition()
@@ -118,9 +122,7 @@ class DinningPhilosopher : public Monitor {
 			state[i] = HUNGRY;
 			test(i);
 			if (state[i] != EATING) {
-				--in_mo;
 				self[i].wait();
-				++in_mo;
 			}
 
 			print();
