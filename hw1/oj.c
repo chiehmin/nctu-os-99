@@ -14,7 +14,7 @@ typedef unsigned long sz_t;
 const char *RES[6] = {"CORRECT", "WRONG-ANSWER", "RUN-ERROR", "TIME-LIMIT", "MEMORY-LIMIT", "FILE-LIMIT"};
 enum {AC, WA, RE, TLE, MLE, FLE};
 
-const char *JUDGE_OUT = "/tmp/judge-output.shaform";
+const char *JUDGE_OUT = "judge-output.shaform";
 
 
 int cmp(FILE *a, FILE *b)
@@ -38,20 +38,12 @@ void solve(const char *ef, const char *in, const char *out, int tl, int ml, int 
 {
 	int ret, res;
 	pid_t c_pid;
-	unsigned long vsize = 0;
 
 	struct rusage ru;
 
-	/*int fd[2];*/
 	FILE *exout, *solout;
 	sz_t mem, used, file;
 
-	/*
-	if (pipe(fd) == -1) {
-		perror("Pipe failed\n");
-		return;
-	}
-	*/
 
 	switch (c_pid = fork()) {
 		case -1:
@@ -61,32 +53,49 @@ void solve(const char *ef, const char *in, const char *out, int tl, int ml, int 
 			/* child process */
 			freopen(in, "r", stdin);
 			freopen(JUDGE_OUT, "w", stdout);
+
+			struct rlimit lim;
+			// set time limit
+			lim.rlim_cur = tl+1;
+			lim.rlim_max = 2*lim.rlim_cur;
+			setrlimit(RLIMIT_CPU, &lim);
+			// set output limit
+			lim.rlim_cur = fl;
+			lim.rlim_max = 2*lim.rlim_cur;
+			setrlimit(RLIMIT_FSIZE, &lim);
+			// run !!
 			execl(ef, ef, NULL);
 
 			break;
 		default:
 			/* parent process */
-			/* close wirte end */
-			/*close(fd[1]);*/
+
+			wait3(&ret, 0, &ru); 
 
 
-			wait3(&ret, WUNTRACED, &ru); 
+			if (WIFSIGNALED(ret)) {
+				switch (WTERMSIG(ret)) {
+					case SIGXFSZ:
+						res = FLE;
+						break;
+					case SIGXCPU:
+						res = TLE;
+						break;
+					default:
+						res = RE;
+				}
+			} else {
+				exout = fopen(JUDGE_OUT, "r");
+				solout = fopen(out, "r");
 
-			mem = ru.ru_minflt*sysconf(_SC_PAGESIZE)/1024;
-			used = ru.ru_utime.tv_sec*1000000 + ru.ru_utime.tv_usec
-				+ ru.ru_stime.tv_sec*1000000 + ru.ru_stime.tv_usec;
-			used /= 1000000;
+				mem = ru.ru_minflt*getpagesize()/1024;
+				used = ru.ru_utime.tv_sec*1000000 + ru.ru_utime.tv_usec
+					+ ru.ru_stime.tv_sec*1000000 + ru.ru_stime.tv_usec;
+				used /= 1000;
 
-			file = get_file(JUDGE_OUT);
+				file = get_file(JUDGE_OUT);
 
-			/*exout = fdopen(fd[0], "r");*/
-			exout = fopen(JUDGE_OUT, "r");
-			solout = fopen(out, "r");
-
-			if (WIFEXITED(ret)) {
-				if (used > tl)
-					res = TLE;
-				else if (mem > ml)
+				if (mem > ml)
 					res = MLE;
 				else if (file > fl)
 					res = FLE;
@@ -95,14 +104,14 @@ void solve(const char *ef, const char *in, const char *out, int tl, int ml, int 
 				else
 					res = WA;
 
-			} else
-				res = RE;
+				fclose(solout);
+				fclose(exout);
+			}
 
-			fclose(solout);
-			fclose(exout);
-
-			printf("%s: %lu %lu %lu\n", RES[res], used, mem, file);
-
+			if (res == AC)
+				printf("CORRECT: %lu %lu %lu\n", used, mem, file);
+			else
+				printf("%s\n", RES[res]);
 	}
 }
 
