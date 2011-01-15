@@ -48,7 +48,7 @@ void solve(const char *ef, const char *in, const char *out, int tl, int ml, int 
 	switch (c_pid = fork()) {
 		case -1:
 			perror("fork failed!\n");
-			break;
+			return;
 		case 0:
 			/* child process */
 			freopen(in, "r", stdin);
@@ -66,7 +66,7 @@ void solve(const char *ef, const char *in, const char *out, int tl, int ml, int 
 			// run !!
 			execl(ef, ef, NULL);
 
-			break;
+			return;
 		default:
 			/* parent process */
 
@@ -108,10 +108,12 @@ void solve(const char *ef, const char *in, const char *out, int tl, int ml, int 
 				fclose(exout);
 			}
 
-			if (res == AC)
+			if (res == AC) {
 				printf("CORRECT: %lu %lu %lu\n", used, mem, file);
-			else
+			} else {
 				printf("%s\n", RES[res]);
+			}
+			fflush(stdout);
 	}
 }
 
